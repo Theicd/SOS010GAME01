@@ -1,14 +1,13 @@
-/* Roblox-style NZ:P HUD: stick = look, buttons = walk / pickup / fire / jump */
+/* Roblox-style NZ:P HUD: stick = slow analog look, buttons = walk / pickup / fire / jump */
 (function () {
   function isTouch() {
     return window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   }
   if (!isTouch()) return;
 
-  var keys = {
-    w: false, left: false, right: false, lookup: false, lookdown: false,
-    ctrl: false, space: false, e: false
-  };
+  var keys = { w: false, ctrl: false, space: false, e: false };
+  var LOOK_SPEED = 2.15;
+  var LOOK_DEAD = 0.12;
 
   function canvasEl() {
     return (typeof Module !== 'undefined' && Module.canvas) || document.getElementById('canvas');
@@ -44,10 +43,6 @@
     if (keys[name] === down) return;
     keys[name] = down;
     if (name === 'w') fireKey(down, 'w', 'KeyW', 87);
-    if (name === 'left') fireKey(down, 'ArrowLeft', 'ArrowLeft', 37);
-    if (name === 'right') fireKey(down, 'ArrowRight', 'ArrowRight', 39);
-    if (name === 'lookup') fireKey(down, 'ArrowUp', 'ArrowUp', 38);
-    if (name === 'lookdown') fireKey(down, 'ArrowDown', 'ArrowDown', 40);
     if (name === 'ctrl') {
       fireKey(down, 'Control', 'ControlLeft', 17);
       var canvas = canvasEl();
@@ -84,17 +79,23 @@
       Object.defineProperty(ev, 'movementY', { get: function () { return my; } });
     } catch (err) {}
     canvas.dispatchEvent(ev);
-    document.dispatchEvent(ev);
+  }
+
+  function curve(n) {
+    var mag = Math.abs(n);
+    if (mag < LOOK_DEAD) return 0;
+    var t = (mag - LOOK_DEAD) / (1 - LOOK_DEAD);
+    return Math.sign(n) * t * t;
   }
 
   var hud = document.createElement('div');
   hud.id = 'nzpTouchHud';
   hud.innerHTML =
     '<div class="nzp-joy" id="nzpJoy"><div class="nzp-joy__base"><div class="nzp-joy__stick" id="nzpJoyStick"></div></div></div>' +
-    '<div class="nzp-act nzp-act--fwd" id="nzpFwd" role="button">קדימה</div>' +
-    '<div class="nzp-act nzp-act--use" id="nzpUse" role="button">איסוף</div>' +
-    '<div class="nzp-act nzp-act--jump" id="nzpJump" role="button">קפיצה</div>' +
-    '<div class="nzp-act nzp-act--fire" id="nzpFire" role="button">ירי</div>';
+    '<div class="nzp-act nzp-act--fwd" id="nzpFwd" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l7 8h-4v8H9v-8H5z"/></svg><span>קדימה</span></div>' +
+    '<div class="nzp-act nzp-act--use" id="nzpUse" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg><span>איסוף</span></div>' +
+    '<div class="nzp-act nzp-act--jump" id="nzpJump" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-6 5 6H7z"/></svg><span>קפיצה</span></div>' +
+    '<div class="nzp-act nzp-act--fire" id="nzpFire" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>ירי</span></div>';
   document.body.appendChild(hud);
   var canvas0 = canvasEl();
   if (canvas0) {
@@ -104,7 +105,7 @@
 
   var stick = document.getElementById('nzpJoyStick');
   var joy = document.getElementById('nzpJoy');
-  var max = 46;
+  var max = 42;
   var joyOn = false;
   var lookNx = 0;
   var lookNy = 0;
@@ -118,10 +119,6 @@
     stick.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
     lookNx = dx / max;
     lookNy = dy / max;
-    setKey('left', lookNx < -0.28);
-    setKey('right', lookNx > 0.28);
-    setKey('lookup', lookNy < -0.28);
-    setKey('lookdown', lookNy > 0.28);
   }
 
   joy.addEventListener('touchstart', function (e) {
@@ -144,17 +141,15 @@
     stick.style.transform = 'translate(0,0)';
     lookNx = 0;
     lookNy = 0;
-    setKey('left', false);
-    setKey('right', false);
-    setKey('lookup', false);
-    setKey('lookdown', false);
   }
   joy.addEventListener('touchend', joyEnd);
   joy.addEventListener('touchcancel', joyEnd);
 
   function lookTick() {
-    if (joyOn && (Math.abs(lookNx) > 0.08 || Math.abs(lookNy) > 0.08)) {
-      sendMouseLook(lookNx * 14, lookNy * 14);
+    if (joyOn) {
+      var mx = curve(lookNx) * LOOK_SPEED;
+      var my = curve(lookNy) * LOOK_SPEED;
+      if (mx || my) sendMouseLook(mx, my);
     }
     requestAnimationFrame(lookTick);
   }
