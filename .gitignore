@@ -1,5 +1,7 @@
 nzportable-win64.zip
 nzp/config.cfg
+web/CNAME
+web/.github/
 *.log
 Thumbs.db
 Desktop.ini
