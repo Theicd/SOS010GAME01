@@ -59,24 +59,21 @@
 	@media (pointer: coarse) {
 		body.nzp-ready #nzpTouchHud { display:block; }
 	}
-	.nzp-joy {
-		position:fixed; left:14px; bottom:calc(22px + env(safe-area-inset-bottom, 0px)); z-index:30;
-		width:128px; height:128px; touch-action:none;
+	.nzp-look {
+		position:fixed; inset:0; z-index:20;
+		touch-action:none;
 	}
-	.nzp-joy__base {
-		position:relative;
-		width:128px; height:128px; border-radius:50%;
-		background:rgba(255,255,255,.06);
-		border:2px solid rgba(255,255,255,.28);
-		box-shadow:inset 0 0 18px rgba(0,0,0,.35);
-	}
-	.nzp-joy__stick {
-		position:absolute; left:50%; top:50%; width:48px; height:48px; margin:-24px 0 0 -24px;
-		border-radius:50%;
-		background:rgba(255,255,255,.18);
-		border:2px solid rgba(255,255,255,.55);
-		box-shadow:0 0 10px rgba(0,175,255,.25);
+	.nzp-lookhint {
+		position:fixed; left:16px; bottom:calc(26px + env(safe-area-inset-bottom, 0px));
+		width:112px; height:112px; border-radius:50%; z-index:29;
+		border:2px solid rgba(255,255,255,.38);
+		box-shadow:0 0 18px rgba(255,255,255,.12);
 		pointer-events:none;
+		animation:nzpHint 1.7s ease-in-out infinite;
+	}
+	@keyframes nzpHint {
+		0%, 100% { opacity:.22; transform:scale(.94); }
+		50% { opacity:.7; transform:scale(1); }
 	}
 	.nzp-act {
 		position:fixed; z-index:31; border:0; color:rgba(255,255,255,.92);
@@ -94,7 +91,11 @@
 	}
 	.nzp-act--fwd {
 		right:102px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); width:58px; height:58px; border-radius:50%;
-		color:#d6f3ff; border-color:rgba(0,175,255,.4);
+		color:#d6f3ff; border-color:rgba(45,136,255,.45);
+	}
+	.nzp-act--back {
+		right:166px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); width:54px; height:54px; border-radius:50%;
+		color:#d6f3ff; border-color:rgba(255,255,255,.32);
 	}
 	.nzp-act--jump {
 		right:16px; bottom:calc(112px + env(safe-area-inset-bottom, 0px)); width:54px; height:54px; border-radius:50%;
@@ -102,7 +103,7 @@
 	}
 	.nzp-act--use {
 		right:80px; bottom:calc(112px + env(safe-area-inset-bottom, 0px)); width:54px; height:54px; border-radius:50%;
-		color:#dcecff; border-color:rgba(8,104,255,.4);
+		color:#dcecff; border-color:rgba(45,136,255,.4);
 	}
 	</style>
   </head>
@@ -177,7 +178,7 @@ var Module = {
 			if (!window._nzpTouchHud) {
 				window._nzpTouchHud = true;
 				var s = document.createElement('script');
-				s.src = 'touch-hud.js?v=20260915nzp10';
+				s.src = 'touch-hud.js?v=20260915nzp11';
 				document.body.appendChild(s);
 			}
 		}

@@ -1,13 +1,15 @@
-/* Stick = mouse look via FTE engine callback. Forward/fire/jump/use = buttons. */
+/* Look = drag on screen (engine mouse). Left ring is a hint only. Buttons = walk / back / fire / jump / use. */
 (function () {
   function isTouch() {
     return window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   }
   if (!isTouch()) return;
 
-  var keys = { forward: false, attack: false, jump: false, use: false };
-  var LOOK_SPEED = 7.5;
-  var LOOK_DEAD = 0.1;
+  var keys = { forward: false, back: false, attack: false, jump: false, use: false };
+  var LOOK_SCALE = 1.35;
+  var WALK_TOP = 280;
+  var WALK_SMOOTH_UP = 0.16;
+  var WALK_SMOOTH_DOWN = 0.24;
 
   function canvasEl() {
     return (typeof Module !== 'undefined' && Module.canvas) || document.getElementById('canvas');
@@ -51,6 +53,7 @@
 
   var keyMap = {
     forward: ['w', 'KeyW', 87],
+    back: ['s', 'KeyS', 83],
     attack: ['Control', 'ControlLeft', 17],
     jump: [' ', 'Space', 32],
     use: ['e', 'KeyE', 69]
@@ -78,24 +81,18 @@
     }
   }
 
-  function curve(n) {
-    var mag = Math.abs(n);
-    if (mag < LOOK_DEAD) return 0;
-    var t = (mag - LOOK_DEAD) / (1 - LOOK_DEAD);
-    return Math.sign(n) * t * t;
-  }
-
   function allKeysUp() {
+    walkCmd = null;
     Object.keys(keys).forEach(function (k) { setImpulse(k, false); });
-    lookNx = 0;
-    lookNy = 0;
   }
 
   var hud = document.createElement('div');
   hud.id = 'nzpTouchHud';
   hud.innerHTML =
-    '<div class="nzp-joy" id="nzpJoy"><div class="nzp-joy__base"><div class="nzp-joy__stick" id="nzpJoyStick"></div></div></div>' +
+    '<div class="nzp-look" id="nzpLook"></div>' +
+    '<div class="nzp-lookhint" id="nzpLookHint" aria-hidden="true"></div>' +
     '<div class="nzp-act nzp-act--fwd" id="nzpFwd" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l7 8h-4v8H9v-8H5z"/></svg><span>קדימה</span></div>' +
+    '<div class="nzp-act nzp-act--back" id="nzpBack" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l-7-8h4V4h6v8h4z"/></svg><span>אחורה</span></div>' +
     '<div class="nzp-act nzp-act--use" id="nzpUse" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg><span>איסוף</span></div>' +
     '<div class="nzp-act nzp-act--jump" id="nzpJump" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-6 5 6H7z"/></svg><span>קפיצה</span></div>' +
     '<div class="nzp-act nzp-act--fire" id="nzpFire" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>ירי</span></div>';
@@ -106,64 +103,89 @@
     try { canvas0.focus(); } catch (e) {}
   }
 
-  var stickEl = document.getElementById('nzpJoyStick');
-  var joy = document.getElementById('nzpJoy');
-  var max = 42;
-  var joyOn = false;
-  var lookNx = 0;
-  var lookNy = 0;
+  var lookPad = document.getElementById('nzpLook');
+  var looking = false;
+  var lastX = 0;
+  var lastY = 0;
+  var smx = 0;
+  var smy = 0;
 
-  function applyLook(dx, dy) {
-    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    if (dist > max) {
-      dx = (dx / dist) * max;
-      dy = (dy / dist) * max;
-    }
-    stickEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-    lookNx = dx / max;
-    lookNy = dy / max;
-  }
-
-  joy.addEventListener('touchstart', function (e) {
+  lookPad.addEventListener('touchstart', function (e) {
+    if (!e.changedTouches.length) return;
     e.preventDefault();
-    e.stopPropagation();
-    joyOn = true;
+    looking = true;
+    lastX = e.changedTouches[0].clientX;
+    lastY = e.changedTouches[0].clientY;
+    smx = 0;
+    smy = 0;
     var canvas = canvasEl();
     if (canvas) {
       try { canvas.focus(); } catch (err) {}
     }
   }, { passive: false });
-  joy.addEventListener('touchmove', function (e) {
-    if (!joyOn) return;
+  lookPad.addEventListener('touchmove', function (e) {
+    if (!looking || !e.touches.length) return;
     e.preventDefault();
-    e.stopPropagation();
     var t = e.touches[0];
-    var r = joy.getBoundingClientRect();
-    applyLook(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
+    var dx = (t.clientX - lastX) * LOOK_SCALE;
+    var dy = (t.clientY - lastY) * LOOK_SCALE;
+    lastX = t.clientX;
+    lastY = t.clientY;
+    smx = smx * 0.28 + dx * 0.72;
+    smy = smy * 0.28 + dy * 0.72;
+    if (smx || smy) fteLook(smx, smy);
   }, { passive: false });
-  function joyEnd(e) {
-    if (e) {
+  function lookEnd(e) {
+    if (e) e.preventDefault();
+    looking = false;
+    smx = 0;
+    smy = 0;
+  }
+  lookPad.addEventListener('touchend', lookEnd, { passive: false });
+  lookPad.addEventListener('touchcancel', lookEnd, { passive: false });
+
+  var walkCmd = null;
+  var walkSpeed = 0;
+  var lastSentSpeed = -1;
+
+  function walkTick() {
+    var target = walkCmd ? WALK_TOP : 0;
+    walkSpeed += (target - walkSpeed) * (walkCmd ? WALK_SMOOTH_UP : WALK_SMOOTH_DOWN);
+    if (!walkCmd && walkSpeed < 12) {
+      walkSpeed = 0;
+      setImpulse('forward', false);
+      setImpulse('back', false);
+      lastSentSpeed = -1;
+    } else if (walkCmd) {
+      var s = Math.round(Math.max(48, walkSpeed));
+      if (Math.abs(s - lastSentSpeed) >= 8) {
+        cbuf('cl_forwardspeed ' + s);
+        cbuf('cl_backspeed ' + s);
+        lastSentSpeed = s;
+      }
+      setImpulse(walkCmd, true);
+      setImpulse(walkCmd === 'forward' ? 'back' : 'forward', false);
+    }
+    requestAnimationFrame(walkTick);
+  }
+  requestAnimationFrame(walkTick);
+
+  function holdWalk(id, name) {
+    var el = document.getElementById(id);
+    function down(e) {
       e.preventDefault();
       e.stopPropagation();
+      walkCmd = name;
     }
-    joyOn = false;
-    stickEl.style.transform = 'translate(0,0)';
-    lookNx = 0;
-    lookNy = 0;
-  }
-  joy.addEventListener('touchend', joyEnd, { passive: false });
-  joy.addEventListener('touchcancel', joyEnd, { passive: false });
-
-  function lookTick() {
-    if (joyOn) {
-      var mx = curve(lookNx) * LOOK_SPEED;
-      var my = curve(lookNy) * LOOK_SPEED;
-      if (mx || my) fteLook(mx, my);
+    function up(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (walkCmd === name) walkCmd = null;
     }
-    requestAnimationFrame(lookTick);
+    el.addEventListener('touchstart', down, { passive: false });
+    el.addEventListener('touchend', up, { passive: false });
+    el.addEventListener('touchcancel', up, { passive: false });
   }
-  requestAnimationFrame(lookTick);
-
   function holdBtn(id, name) {
     var el = document.getElementById(id);
     function down(e) {
@@ -180,8 +202,9 @@
     el.addEventListener('touchend', up, { passive: false });
     el.addEventListener('touchcancel', up, { passive: false });
   }
+  holdWalk('nzpFwd', 'forward');
+  holdWalk('nzpBack', 'back');
   holdBtn('nzpFire', 'attack');
-  holdBtn('nzpFwd', 'forward');
   holdBtn('nzpUse', 'use');
   holdBtn('nzpJump', 'jump');
 
