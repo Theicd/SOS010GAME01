@@ -12,14 +12,49 @@
 	<title>NZ: Portable</title>
 	<link rel="icon" href="nzportable.ico">
 	<style>
-	html,body { background-color:#000000; color:#808080; height:100%;width:100%;margin:0;padding:0;}
+	html,body { background-color:#030a14; color:#8fa2b7; height:100%;width:100%;margin:0;padding:0;overflow:hidden;}
 	.emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
 	div.emscripten { text-align: center; padding:0; margin: 0;}
-	/* the canvas *must not* have any border or padding, or mouse coords will be wrong */
 	canvas.emscripten { border: 0px none; width:100%; height:100%; padding:0; margin: 0;}
+	#status, #progress { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+	#sosLoad {
+		position:fixed; inset:0; z-index:40;
+		background:#030a14 url('nzp-cover.png') center / cover no-repeat;
+		display:flex; align-items:flex-end; justify-content:center;
+	}
+	#sosLoad[hidden] { display:none !important; }
+	#sosLoad::before {
+		content:''; position:absolute; inset:0;
+		background:linear-gradient(180deg, rgba(3,10,20,.25) 0%, rgba(3,10,20,.72) 48%, rgba(3,10,20,.96) 100%);
+	}
+	#sosLoadUi { position:relative; width:min(520px, 88vw); padding:0 0 12vh; text-align:center; }
+	#sosLoadTitle { color:#00afff; font:700 13px system-ui; letter-spacing:.18em; margin-bottom:8px; }
+	#sosLoadName { color:#f4f7fb; font:700 28px/1.1 system-ui; margin:0 0 18px; }
+	#sosLoadBar {
+		height:10px; border-radius:999px; overflow:hidden;
+		background:rgba(0,175,255,.18); border:1px solid rgba(0,175,255,.4);
+		box-shadow:0 0 18px rgba(0,175,255,.25);
+	}
+	#sosLoadFill {
+		display:block; height:100%; width:8%;
+		background:linear-gradient(90deg, #0868ff, #00afff, #4dd4ff);
+		background-size:200% 100%;
+		animation:sosLoadShine 1.4s linear infinite;
+		transition:width .25s ease;
+	}
+	#sosLoadText { margin-top:12px; color:#8fa2b7; font:600 14px system-ui; }
+	@keyframes sosLoadShine { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
 	</style>
   </head>
   <body ondrop="gotdrop(event);" ondragover="event.preventDefault()">
+	<div id="sosLoad">
+		<div id="sosLoadUi">
+			<div id="sosLoadTitle">SOS PLAY</div>
+			<div id="sosLoadName">NZ:P</div>
+			<div id="sosLoadBar"><i id="sosLoadFill"></i></div>
+			<div id="sosLoadText">טוען את הזירה...</div>
+		</div>
+	</div>
 	<div class="emscripten" id="status">Please allow/unblock our javascript to play.</div>
 	<div id="dropzone" ondrop="gotdrop(event);" ondragover="event.preventDefault()" hidden=1>Drop Zone</div>
 	<button type="button" onclick="begin()" id="begin" hidden=1>Click To Begin!</button>
@@ -64,7 +99,18 @@ var Module = {
 		}
 		statusElement.innerHTML = text;
 		statusElement.hidden = text.length==0;
-		if (text.length==0) sosNotify('ready');
+		var fill = document.getElementById('sosLoadFill');
+		var loadText = document.getElementById('sosLoadText');
+		var load = document.getElementById('sosLoad');
+		if (fill && m) {
+			var pct = Math.max(8, Math.round(100 * parseInt(m[2], 10) / Math.max(1, parseInt(m[4], 10))));
+			fill.style.width = pct + '%';
+		}
+		if (loadText && text) loadText.textContent = text;
+		if (text.length==0) {
+			sosNotify('ready');
+			if (load) load.hidden = true;
+		}
 	},
 //	preRun: [],
 	totalDependencies: 0,
