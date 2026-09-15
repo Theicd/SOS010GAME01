@@ -1,14 +1,13 @@
-/* Stick = walk (FTE +forward etc). Drag on canvas = look. Buttons = fire / pickup / jump. */
+/* Stick = mouse look via FTE engine callback. Forward/fire/jump/use = buttons. */
 (function () {
   function isTouch() {
     return window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   }
   if (!isTouch()) return;
 
-  var keys = { forward: false, back: false, moveleft: false, moveright: false, attack: false, jump: false, use: false };
-  var stick = { forward: false, back: false, moveleft: false, moveright: false };
-  var held = { forward: false, attack: false, jump: false, use: false };
-  var DEAD = 0.28;
+  var keys = { forward: false, attack: false, jump: false, use: false };
+  var LOOK_SPEED = 7.5;
+  var LOOK_DEAD = 0.1;
 
   function canvasEl() {
     return (typeof Module !== 'undefined' && Module.canvas) || document.getElementById('canvas');
@@ -52,9 +51,6 @@
 
   var keyMap = {
     forward: ['w', 'KeyW', 87],
-    back: ['s', 'KeyS', 83],
-    moveleft: ['a', 'KeyA', 65],
-    moveright: ['d', 'KeyD', 68],
     attack: ['Control', 'ControlLeft', 17],
     jump: [' ', 'Space', 32],
     use: ['e', 'KeyE', 69]
@@ -66,33 +62,33 @@
     if (cbuf((down ? '+' : '-') + name)) return;
     var k = keyMap[name];
     if (k) fireKey(down, k[0], k[1], k[2]);
-    if (name === 'attack') {
-      var canvas = canvasEl();
-      if (canvas) {
-        canvas.dispatchEvent(new MouseEvent(down ? 'mousedown' : 'mouseup', {
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-          buttons: down ? 1 : 0
-        }));
-      }
+  }
+
+  function fteLook(mx, my) {
+    try {
+      if (typeof FTEC === 'undefined' || !FTEC.evcb || !FTEC.evcb.mouse) return false;
+      var fn = null;
+      if (typeof getWasmTableEntry === 'function') fn = getWasmTableEntry(FTEC.evcb.mouse);
+      else if (typeof wasmTable !== 'undefined' && wasmTable.get) fn = wasmTable.get(FTEC.evcb.mouse);
+      if (!fn) return false;
+      fn(0, false, mx, my, 0, 0);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
-  function syncMove() {
-    setImpulse('forward', !!(stick.forward || held.forward));
-    setImpulse('back', !!stick.back);
-    setImpulse('moveleft', !!stick.moveleft);
-    setImpulse('moveright', !!stick.moveright);
-    setImpulse('attack', !!held.attack);
-    setImpulse('jump', !!held.jump);
-    setImpulse('use', !!held.use);
+  function curve(n) {
+    var mag = Math.abs(n);
+    if (mag < LOOK_DEAD) return 0;
+    var t = (mag - LOOK_DEAD) / (1 - LOOK_DEAD);
+    return Math.sign(n) * t * t;
   }
 
   function allKeysUp() {
-    stick.forward = stick.back = stick.moveleft = stick.moveright = false;
-    held.forward = held.attack = held.jump = held.use = false;
-    syncMove();
+    Object.keys(keys).forEach(function (k) { setImpulse(k, false); });
+    lookNx = 0;
+    lookNy = 0;
   }
 
   var hud = document.createElement('div');
@@ -114,21 +110,18 @@
   var joy = document.getElementById('nzpJoy');
   var max = 42;
   var joyOn = false;
+  var lookNx = 0;
+  var lookNy = 0;
 
-  function applyStick(dx, dy) {
+  function applyLook(dx, dy) {
     var dist = Math.sqrt(dx * dx + dy * dy) || 1;
     if (dist > max) {
       dx = (dx / dist) * max;
       dy = (dy / dist) * max;
     }
     stickEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-    var nx = dx / max;
-    var ny = dy / max;
-    stick.forward = ny < -DEAD;
-    stick.back = ny > DEAD;
-    stick.moveleft = nx < -DEAD;
-    stick.moveright = nx > DEAD;
-    syncMove();
+    lookNx = dx / max;
+    lookNy = dy / max;
   }
 
   joy.addEventListener('touchstart', function (e) {
@@ -146,7 +139,7 @@
     e.stopPropagation();
     var t = e.touches[0];
     var r = joy.getBoundingClientRect();
-    applyStick(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
+    applyLook(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
   }, { passive: false });
   function joyEnd(e) {
     if (e) {
@@ -155,25 +148,33 @@
     }
     joyOn = false;
     stickEl.style.transform = 'translate(0,0)';
-    stick.forward = stick.back = stick.moveleft = stick.moveright = false;
-    syncMove();
+    lookNx = 0;
+    lookNy = 0;
   }
   joy.addEventListener('touchend', joyEnd, { passive: false });
   joy.addEventListener('touchcancel', joyEnd, { passive: false });
+
+  function lookTick() {
+    if (joyOn) {
+      var mx = curve(lookNx) * LOOK_SPEED;
+      var my = curve(lookNy) * LOOK_SPEED;
+      if (mx || my) fteLook(mx, my);
+    }
+    requestAnimationFrame(lookTick);
+  }
+  requestAnimationFrame(lookTick);
 
   function holdBtn(id, name) {
     var el = document.getElementById(id);
     function down(e) {
       e.preventDefault();
       e.stopPropagation();
-      held[name] = true;
-      syncMove();
+      setImpulse(name, true);
     }
     function up(e) {
       e.preventDefault();
       e.stopPropagation();
-      held[name] = false;
-      syncMove();
+      setImpulse(name, false);
     }
     el.addEventListener('touchstart', down, { passive: false });
     el.addEventListener('touchend', up, { passive: false });

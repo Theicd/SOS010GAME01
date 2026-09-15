@@ -12,15 +12,21 @@
 	<title>NZ: Portable</title>
 	<link rel="icon" href="nzportable.ico">
 	<style>
-	html,body { background-color:#18191a; color:#b0b3b8; height:100%;width:100%;margin:0;padding:0;overflow:hidden;}
+	html,body { background-color:#030a14; color:#c5d0dc; height:100%;width:100%;margin:0;padding:0;overflow:hidden;}
 	.emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
 	div.emscripten { text-align: center; padding:0; margin: 0;}
 	canvas.emscripten { border: 0px none; width:100%; height:100%; padding:0; margin: 0; touch-action:none; outline:none;}
 	#status, #progress { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
 	#sosLoad {
 		position:fixed; inset:0; z-index:40;
-		background:#18191a;
+		background:#030a14;
 		display:flex; align-items:flex-end; justify-content:center;
+	}
+	#sosLoadBlur {
+		position:absolute; inset:-40px;
+		background:#030a14 url('nzp-cover.png') center / cover no-repeat;
+		filter:blur(36px) saturate(1.3) brightness(.42);
+		transform:scale(1.12);
 	}
 	#sosLoadArt {
 		position:absolute; inset:0;
@@ -28,26 +34,27 @@
 		object-fit:contain;
 		object-position:center center;
 		pointer-events:none;
+		z-index:1;
 	}
 	#sosLoad[hidden] { display:none !important; }
 	#sosLoad::before {
-		content:''; position:absolute; inset:0;
-		background:linear-gradient(180deg, rgba(24,25,26,.18) 0%, rgba(24,25,26,.28) 46%, rgba(24,25,26,.92) 100%);
+		content:''; position:absolute; inset:0; z-index:1;
+		background:linear-gradient(180deg, rgba(3,10,20,.2) 0%, rgba(3,10,20,.28) 48%, rgba(3,10,20,.88) 100%);
 		pointer-events:none;
 	}
-	#sosLoadUi { position:relative; width:min(520px, 88vw); padding:0 0 12vh; text-align:center; z-index:1; }
-	#sosLoadTitle { color:#b0b3b8; font:700 13px "Segoe UI",system-ui; letter-spacing:.12em; margin-bottom:8px; }
-	#sosLoadName { color:#e4e6eb; font:700 28px/1.1 "Segoe UI",system-ui; margin:0 0 18px; }
+	#sosLoadUi { position:relative; width:min(520px, 88vw); padding:0 0 12vh; text-align:center; z-index:2; }
+	#sosLoadTitle { color:#d7e4f0; font:700 13px "Segoe UI",system-ui; letter-spacing:.12em; margin-bottom:8px; }
+	#sosLoadName { color:#f4f7fb; font:700 28px/1.1 "Segoe UI",system-ui; margin:0 0 18px; }
 	#sosLoadBar {
 		height:10px; border-radius:999px; overflow:hidden;
-		background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.15);
+		background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
 	}
 	#sosLoadFill {
 		display:block; height:100%; width:8%;
 		background:#2d88ff;
 		transition:width .25s ease;
 	}
-	#sosLoadText { margin-top:12px; color:#b0b3b8; font:600 14px "Segoe UI",system-ui; }
+	#sosLoadText { margin-top:12px; color:#c5d0dc; font:600 14px "Segoe UI",system-ui; }
 	#nzpTouchHud { display:none; }
 	@media (pointer: coarse) {
 		body.nzp-ready #nzpTouchHud { display:block; }
@@ -101,6 +108,7 @@
   </head>
   <body ondrop="gotdrop(event);" ondragover="event.preventDefault()">
 	<div id="sosLoad">
+		<div id="sosLoadBlur"></div>
 		<img id="sosLoadArt" src="nzp-cover.png" alt="">
 		<div id="sosLoadUi">
 			<div id="sosLoadTitle">SOS PLAY</div>
@@ -169,7 +177,7 @@ var Module = {
 			if (!window._nzpTouchHud) {
 				window._nzpTouchHud = true;
 				var s = document.createElement('script');
-				s.src = 'touch-hud.js?v=20260915nzp9';
+				s.src = 'touch-hud.js?v=20260915nzp10';
 				document.body.appendChild(s);
 			}
 		}
