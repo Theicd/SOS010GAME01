@@ -15,7 +15,7 @@
 	html,body { background-color:#030a14; color:#8fa2b7; height:100%;width:100%;margin:0;padding:0;overflow:hidden;}
 	.emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
 	div.emscripten { text-align: center; padding:0; margin: 0;}
-	canvas.emscripten { border: 0px none; width:100%; height:100%; padding:0; margin: 0;}
+	canvas.emscripten { border: 0px none; width:100%; height:100%; padding:0; margin: 0; touch-action:none; outline:none;}
 	#status, #progress { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
 	#sosLoad {
 		position:fixed; inset:0; z-index:40;
@@ -44,6 +44,43 @@
 	}
 	#sosLoadText { margin-top:12px; color:#8fa2b7; font:600 14px system-ui; }
 	@keyframes sosLoadShine { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+	#nzpTouchHud { display:none; }
+	@media (pointer: coarse) {
+		body.nzp-ready #nzpTouchHud { display:block; }
+	}
+	.nzp-joy {
+		position:fixed; left:18px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); z-index:30;
+		width:132px; height:132px; touch-action:none;
+	}
+	.nzp-joy__base {
+		width:100%; height:100%; border-radius:50%;
+		background:rgba(3,10,20,.28); border:2px solid rgba(0,175,255,.35);
+	}
+	.nzp-joy__stick {
+		position:absolute; left:50%; top:50%; width:54px; height:54px; margin:-27px 0 0 -27px;
+		border-radius:50%; background:rgba(0,175,255,.55); border:2px solid rgba(255,255,255,.45);
+		pointer-events:none;
+	}
+	.nzp-look {
+		position:fixed; top:0; right:0; bottom:0; width:58%; z-index:20; touch-action:none;
+	}
+	.nzp-act {
+		position:fixed; z-index:31; border:0; color:#fff; font:700 13px system-ui;
+		touch-action:none; -webkit-user-select:none; user-select:none;
+		display:flex; align-items:center; justify-content:center;
+	}
+	.nzp-act--fire {
+		right:18px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); width:86px; height:86px; border-radius:50%;
+		background:rgba(255,48,79,.82);
+	}
+	.nzp-act--fwd {
+		right:112px; bottom:calc(36px + env(safe-area-inset-bottom, 0px)); width:64px; height:64px; border-radius:50%;
+		background:rgba(0,175,255,.72);
+	}
+	.nzp-act--use {
+		right:22px; bottom:calc(124px + env(safe-area-inset-bottom, 0px)); width:58px; height:58px; border-radius:50%;
+		background:rgba(8,104,255,.72);
+	}
 	</style>
   </head>
   <body ondrop="gotdrop(event);" ondragover="event.preventDefault()">
@@ -61,7 +98,7 @@
 	<div class="emscripten">
 		<progress value="0" max="100" id="progress" hidden=1></progress>  
 	</div>
-	<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" hidden=1></canvas>
+	<canvas class="emscripten" id="canvas" tabindex="0" oncontextmenu="event.preventDefault()" hidden=1></canvas>
 	<script type='text/javascript'>
 // connect to canvas
 var Module = {
@@ -69,7 +106,8 @@ var Module = {
 	{
 		"default.fmf" : "default.fmf",
 		"nzp/game.pk3" : "nzp/game.pk3",
-		"nzp/progs.pk3" : "nzp/progs.pk3"
+		"nzp/progs.pk3" : "nzp/progs.pk3",
+		"nzp/autoexec.cfg" : "nzp/autoexec.cfg"
 	},
 	print: function(msg)
 	{	//stdout...
@@ -110,6 +148,13 @@ var Module = {
 		if (text.length==0) {
 			sosNotify('ready');
 			if (load) load.hidden = true;
+			document.body.classList.add('nzp-ready');
+			if (!window._nzpTouchHud) {
+				window._nzpTouchHud = true;
+				var s = document.createElement('script');
+				s.src = 'touch-hud.js?v=20260915nzp4';
+				document.body.appendChild(s);
+			}
 		}
 	},
 //	preRun: [],
@@ -155,7 +200,7 @@ function applySosLaunch()
 	var player = sosSafeToken(q.get('name'), 'Player', 15);
 	var room = sosSafeToken(q.get('room'), ice, 24);
 	var id = '/' + ice;
-	var args = ['+com_protocolname', 'NZP-REBOOT-WEB', '+sv_maxclients', '4', '+name', player, '+net_ice_broker', 'tls://master.frag-net.com:27950'];
+	var args = ['+com_protocolname', 'NZP-REBOOT-WEB', '+sv_maxclients', '4', '+name', player, '+net_ice_broker', 'tls://master.frag-net.com:27950', '+exec', 'autoexec.cfg'];
 	if (role === 'host') {
 		args.push('+hostname', room, '+sv_port_rtc', id, '+map', 'ndu');
 	} else {
@@ -267,6 +312,8 @@ function gotdrop(ev)
 	showfiles();
 }
 var sosLaunch = applySosLaunch();
+Module.arguments = Module.arguments || [];
+if (Module.arguments.indexOf('autoexec.cfg') < 0) Module.arguments.push('+exec', 'autoexec.cfg');
 if (sosLaunch || window.location.hash != "" || Object.keys(Module.files).length)
 	begin();		//if the url has a #foo.fmf then just begin instantly, 
 else
