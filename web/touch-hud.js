@@ -1,11 +1,14 @@
-/* overlay touch HUD for NZ:P WebGL — shown only on coarse pointers */
+/* Roblox-style NZ:P HUD: stick = look, buttons = walk / pickup / fire / jump */
 (function () {
   function isTouch() {
     return window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   }
   if (!isTouch()) return;
 
-  var keys = { w: false, a: false, s: false, d: false, ctrl: false, space: false, e: false };
+  var keys = {
+    w: false, left: false, right: false, lookup: false, lookdown: false,
+    ctrl: false, space: false, e: false
+  };
 
   function canvasEl() {
     return (typeof Module !== 'undefined' && Module.canvas) || document.getElementById('canvas');
@@ -41,9 +44,10 @@
     if (keys[name] === down) return;
     keys[name] = down;
     if (name === 'w') fireKey(down, 'w', 'KeyW', 87);
-    if (name === 'a') fireKey(down, 'a', 'KeyA', 65);
-    if (name === 's') fireKey(down, 's', 'KeyS', 83);
-    if (name === 'd') fireKey(down, 'd', 'KeyD', 68);
+    if (name === 'left') fireKey(down, 'ArrowLeft', 'ArrowLeft', 37);
+    if (name === 'right') fireKey(down, 'ArrowRight', 'ArrowRight', 39);
+    if (name === 'lookup') fireKey(down, 'ArrowUp', 'ArrowUp', 38);
+    if (name === 'lookdown') fireKey(down, 'ArrowDown', 'ArrowDown', 40);
     if (name === 'ctrl') {
       fireKey(down, 'Control', 'ControlLeft', 17);
       var canvas = canvasEl();
@@ -62,15 +66,34 @@
 
   function allKeysUp() {
     Object.keys(keys).forEach(function (k) { setKey(k, false); });
+    lookNx = 0;
+    lookNy = 0;
+  }
+
+  function sendMouseLook(mx, my) {
+    var canvas = canvasEl();
+    if (!canvas || (!mx && !my)) return;
+    var ev = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 0,
+      clientY: 0
+    });
+    try {
+      Object.defineProperty(ev, 'movementX', { get: function () { return mx; } });
+      Object.defineProperty(ev, 'movementY', { get: function () { return my; } });
+    } catch (err) {}
+    canvas.dispatchEvent(ev);
+    document.dispatchEvent(ev);
   }
 
   var hud = document.createElement('div');
   hud.id = 'nzpTouchHud';
   hud.innerHTML =
     '<div class="nzp-joy" id="nzpJoy"><div class="nzp-joy__base"><div class="nzp-joy__stick" id="nzpJoyStick"></div></div></div>' +
-    '<div class="nzp-look" id="nzpLook"></div>' +
     '<div class="nzp-act nzp-act--fwd" id="nzpFwd" role="button">קדימה</div>' +
-    '<div class="nzp-act nzp-act--use" id="nzpUse" role="button">פעולה</div>' +
+    '<div class="nzp-act nzp-act--use" id="nzpUse" role="button">איסוף</div>' +
+    '<div class="nzp-act nzp-act--jump" id="nzpJump" role="button">קפיצה</div>' +
     '<div class="nzp-act nzp-act--fire" id="nzpFire" role="button">ירי</div>';
   document.body.appendChild(hud);
   var canvas0 = canvasEl();
@@ -81,85 +104,61 @@
 
   var stick = document.getElementById('nzpJoyStick');
   var joy = document.getElementById('nzpJoy');
-  var look = document.getElementById('nzpLook');
   var max = 46;
   var joyOn = false;
-  var lookOn = false;
-  var lookX = 0;
-  var lookY = 0;
+  var lookNx = 0;
+  var lookNy = 0;
 
-  function applyJoy(dx, dy) {
+  function applyLook(dx, dy) {
     var dist = Math.sqrt(dx * dx + dy * dy) || 1;
     if (dist > max) {
       dx = (dx / dist) * max;
       dy = (dy / dist) * max;
     }
     stick.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-    var nx = dx / max;
-    var ny = -dy / max;
-    setKey('a', nx < -0.35);
-    setKey('d', nx > 0.35);
-    setKey('w', ny > 0.35);
-    setKey('s', ny < -0.35);
+    lookNx = dx / max;
+    lookNy = dy / max;
+    setKey('left', lookNx < -0.28);
+    setKey('right', lookNx > 0.28);
+    setKey('lookup', lookNy < -0.28);
+    setKey('lookdown', lookNy > 0.28);
   }
 
   joy.addEventListener('touchstart', function (e) {
     e.preventDefault();
     joyOn = true;
+    var canvas = canvasEl();
+    if (canvas) {
+      try { canvas.focus(); } catch (err) {}
+    }
   }, { passive: false });
   joy.addEventListener('touchmove', function (e) {
     if (!joyOn) return;
     e.preventDefault();
     var t = e.touches[0];
     var r = joy.getBoundingClientRect();
-    applyJoy(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
+    applyLook(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
   }, { passive: false });
   function joyEnd() {
     joyOn = false;
     stick.style.transform = 'translate(0,0)';
-    setKey('w', false);
-    setKey('a', false);
-    setKey('s', false);
-    setKey('d', false);
+    lookNx = 0;
+    lookNy = 0;
+    setKey('left', false);
+    setKey('right', false);
+    setKey('lookup', false);
+    setKey('lookdown', false);
   }
   joy.addEventListener('touchend', joyEnd);
   joy.addEventListener('touchcancel', joyEnd);
 
-  look.addEventListener('touchstart', function (e) {
-    e.preventDefault();
-    lookOn = true;
-    lookX = e.touches[0].clientX;
-    lookY = e.touches[0].clientY;
-    var canvas = canvasEl();
-    if (canvas) {
-      try { canvas.focus(); } catch (err) {}
-      try { canvas.requestPointerLock && canvas.requestPointerLock(); } catch (err) {}
+  function lookTick() {
+    if (joyOn && (Math.abs(lookNx) > 0.08 || Math.abs(lookNy) > 0.08)) {
+      sendMouseLook(lookNx * 14, lookNy * 14);
     }
-  }, { passive: false });
-  look.addEventListener('touchmove', function (e) {
-    if (!lookOn) return;
-    e.preventDefault();
-    var t = e.touches[0];
-    var mx = (t.clientX - lookX) * 1.6;
-    var my = (t.clientY - lookY) * 1.6;
-    lookX = t.clientX;
-    lookY = t.clientY;
-    var canvas = canvasEl();
-    if (!canvas) return;
-    var ev = new MouseEvent('mousemove', {
-      bubbles: true,
-      cancelable: true,
-      clientX: t.clientX,
-      clientY: t.clientY
-    });
-    try {
-      Object.defineProperty(ev, 'movementX', { get: function () { return mx; } });
-      Object.defineProperty(ev, 'movementY', { get: function () { return my; } });
-    } catch (err) {}
-    canvas.dispatchEvent(ev);
-  }, { passive: false });
-  look.addEventListener('touchend', function () { lookOn = false; });
-  look.addEventListener('touchcancel', function () { lookOn = false; });
+    requestAnimationFrame(lookTick);
+  }
+  requestAnimationFrame(lookTick);
 
   function holdBtn(id, name) {
     var el = document.getElementById(id);
@@ -172,6 +171,7 @@
   holdBtn('nzpFire', 'ctrl');
   holdBtn('nzpFwd', 'w');
   holdBtn('nzpUse', 'e');
+  holdBtn('nzpJump', 'space');
 
   window.addEventListener('blur', allKeysUp);
   document.addEventListener('visibilitychange', function () {

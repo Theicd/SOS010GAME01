@@ -50,36 +50,38 @@
 	}
 	.nzp-joy {
 		position:fixed; left:18px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); z-index:30;
-		width:132px; height:132px; touch-action:none;
+		width:148px; height:132px; touch-action:none;
 	}
 	.nzp-joy__base {
-		width:100%; height:100%; border-radius:50%;
-		background:rgba(3,10,20,.28); border:2px solid rgba(0,175,255,.35);
+		position:relative;
+		width:132px; height:132px; border-radius:50%;
+		background:rgba(3,10,20,.28); border:2px solid rgba(0,175,255,.45);
 	}
 	.nzp-joy__stick {
 		position:absolute; left:50%; top:50%; width:54px; height:54px; margin:-27px 0 0 -27px;
-		border-radius:50%; background:rgba(0,175,255,.55); border:2px solid rgba(255,255,255,.45);
+		border-radius:50%; background:rgba(0,175,255,.62); border:2px solid rgba(255,255,255,.5);
 		pointer-events:none;
 	}
-	.nzp-look {
-		position:fixed; top:0; right:0; bottom:0; width:58%; z-index:20; touch-action:none;
-	}
 	.nzp-act {
-		position:fixed; z-index:31; border:0; color:#fff; font:700 13px system-ui;
+		position:fixed; z-index:31; border:0; color:#fff; font:700 12px system-ui;
 		touch-action:none; -webkit-user-select:none; user-select:none;
 		display:flex; align-items:center; justify-content:center;
 	}
 	.nzp-act--fire {
-		right:18px; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); width:86px; height:86px; border-radius:50%;
-		background:rgba(255,48,79,.82);
+		right:16px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); width:86px; height:86px; border-radius:50%;
+		background:rgba(255,48,79,.86);
 	}
 	.nzp-act--fwd {
-		right:112px; bottom:calc(36px + env(safe-area-inset-bottom, 0px)); width:64px; height:64px; border-radius:50%;
+		right:112px; bottom:calc(32px + env(safe-area-inset-bottom, 0px)); width:64px; height:64px; border-radius:50%;
+		background:rgba(0,175,255,.78);
+	}
+	.nzp-act--jump {
+		right:18px; bottom:calc(122px + env(safe-area-inset-bottom, 0px)); width:58px; height:58px; border-radius:50%;
 		background:rgba(0,175,255,.72);
 	}
 	.nzp-act--use {
-		right:22px; bottom:calc(124px + env(safe-area-inset-bottom, 0px)); width:58px; height:58px; border-radius:50%;
-		background:rgba(8,104,255,.72);
+		right:86px; bottom:calc(122px + env(safe-area-inset-bottom, 0px)); width:58px; height:58px; border-radius:50%;
+		background:rgba(8,104,255,.78);
 	}
 	</style>
   </head>
@@ -152,7 +154,7 @@ var Module = {
 			if (!window._nzpTouchHud) {
 				window._nzpTouchHud = true;
 				var s = document.createElement('script');
-				s.src = 'touch-hud.js?v=20260915nzp4';
+				s.src = 'touch-hud.js?v=20260915nzp5';
 				document.body.appendChild(s);
 			}
 		}
