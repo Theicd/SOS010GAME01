@@ -225,10 +225,19 @@ function applySosLaunch()
 	if ((role !== 'host' && role !== 'join') || !ice) return false;
 	var player = sosSafeToken(q.get('name'), 'Player', 15);
 	var room = sosSafeToken(q.get('room'), ice, 24);
+	var map = String(q.get('map') || 'ndu').toLowerCase().replace(/[^a-z0-9_\-]/g, '').slice(0, 32);
+	var allowed = {
+		ndu: 1,
+		wahnsinn: 1,
+		nzp_warehouse: 1,
+		nzp_warehouse2: 1,
+		christmas_special: 1
+	};
+	if (!allowed[map]) map = 'ndu';
 	var id = '/' + ice;
 	var args = ['+com_protocolname', 'NZP-REBOOT-WEB', '+sv_maxclients', '4', '+name', player, '+net_ice_broker', 'tls://master.frag-net.com:27950', '+exec', 'autoexec.cfg'];
 	if (role === 'host') {
-		args.push('+hostname', room, '+sv_port_rtc', id, '+map', 'ndu');
+		args.push('+hostname', room, '+sv_port_rtc', id, '+map', map);
 	} else {
 		args.push('+connect', id);
 	}
