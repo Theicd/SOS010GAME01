@@ -1,15 +1,23 @@
-/* Look = drag on screen (engine mouse). Left ring is a hint only. Buttons = walk / back / fire / jump / use. */
+/* Dual sticks + fire / use(E) / ADS toggle / jump for NZ:P mobile. */
 (function () {
   function isTouch() {
     return window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   }
   if (!isTouch()) return;
 
-  var keys = { forward: false, back: false, attack: false, jump: false, use: false };
-  var LOOK_SCALE = 1.35;
-  var WALK_TOP = 280;
-  var WALK_SMOOTH_UP = 0.16;
-  var WALK_SMOOTH_DOWN = 0.24;
+  var keys = {
+    forward: false,
+    back: false,
+    moveleft: false,
+    moveright: false,
+    attack: false,
+    jump: false,
+    use: false,
+    ads: false
+  };
+  var LOOK_SCALE = 1.55;
+  var MOVE_DEAD = 0.22;
+  var STICK_R = 56;
 
   function canvasEl() {
     return (typeof Module !== 'undefined' && Module.canvas) || document.getElementById('canvas');
@@ -54,17 +62,44 @@
   var keyMap = {
     forward: ['w', 'KeyW', 87],
     back: ['s', 'KeyS', 83],
+    moveleft: ['a', 'KeyA', 65],
+    moveright: ['d', 'KeyD', 68],
     attack: ['Control', 'ControlLeft', 17],
     jump: [' ', 'Space', 32],
     use: ['e', 'KeyE', 69]
   };
 
+  var impulseName = {
+    forward: 'forward',
+    back: 'back',
+    moveleft: 'moveleft',
+    moveright: 'moveright',
+    attack: 'attack',
+    use: 'button7',
+    ads: 'button8'
+  };
+
   function setImpulse(name, down) {
     if (keys[name] === down) return;
     keys[name] = down;
-    if (cbuf((down ? '+' : '-') + name)) return;
+    var cmd = impulseName[name];
+    if (cmd && cbuf((down ? '+' : '-') + cmd)) return;
     var k = keyMap[name];
     if (k) fireKey(down, k[0], k[1], k[2]);
+  }
+
+  function setAds(on) {
+    if (keys.ads === on) return;
+    keys.ads = on;
+    cbuf((on ? '+' : '-') + 'button8');
+    var el = document.getElementById('nzpAds');
+    if (el) el.classList.toggle('is-on', on);
+  }
+
+  function tapJump() {
+    if (cbuf('impulse 10')) return;
+    fireKey(true, ' ', 'Space', 32);
+    setTimeout(function () { fireKey(false, ' ', 'Space', 32); }, 40);
   }
 
   function fteLook(mx, my) {
@@ -82,110 +117,158 @@
   }
 
   function allKeysUp() {
-    walkCmd = null;
-    Object.keys(keys).forEach(function (k) { setImpulse(k, false); });
+    Object.keys(keys).forEach(function (k) {
+      if (k === 'ads') setAds(false);
+      else if (k !== 'jump') setImpulse(k, false);
+    });
+    resetStick('move');
+    resetStick('look');
   }
 
   var hud = document.createElement('div');
   hud.id = 'nzpTouchHud';
   hud.innerHTML =
-    '<div class="nzp-look" id="nzpLook"></div>' +
-    '<div class="nzp-lookhint" id="nzpLookHint" aria-hidden="true"></div>' +
-    '<div class="nzp-act nzp-act--fwd" id="nzpFwd" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l7 8h-4v8H9v-8H5z"/></svg><span>קדימה</span></div>' +
-    '<div class="nzp-act nzp-act--back" id="nzpBack" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l-7-8h4V4h6v8h4z"/></svg><span>אחורה</span></div>' +
-    '<div class="nzp-act nzp-act--use" id="nzpUse" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg><span>איסוף</span></div>' +
-    '<div class="nzp-act nzp-act--jump" id="nzpJump" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-6 5 6H7z"/></svg><span>קפיצה</span></div>' +
-    '<div class="nzp-act nzp-act--fire" id="nzpFire" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>ירי</span></div>';
+    '<div class="nzp-stick nzp-stick--move" id="nzpMove">' +
+      '<div class="nzp-stick__base"></div>' +
+      '<div class="nzp-stick__knob" id="nzpMoveKnob"></div>' +
+    '</div>' +
+    '<div class="nzp-stick nzp-stick--look" id="nzpLookStick">' +
+      '<div class="nzp-stick__base"></div>' +
+      '<div class="nzp-stick__knob" id="nzpLookKnob"></div>' +
+    '</div>' +
+    '<button type="button" class="nzp-btn nzp-btn--use" id="nzpUse" aria-label="שימוש">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a2.5 2.5 0 0 0-2.45 2H6a2 2 0 0 0-2 2v2.2c0 .7.4 1.3 1 1.6V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8.2c.6-.3 1-.9 1-1.6V7a2 2 0 0 0-2-2h-1.05A2.5 2.5 0 0 0 14.5 3h-5zm0 2h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1z"/></svg>' +
+    '</button>' +
+    '<button type="button" class="nzp-btn nzp-btn--ads" id="nzpAds" aria-label="כוונת">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" fill="none" stroke="currentColor" stroke-width="2"/></svg>' +
+    '</button>' +
+    '<button type="button" class="nzp-btn nzp-btn--fire" id="nzpFire" aria-label="ירי">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>' +
+    '</button>' +
+    '<button type="button" class="nzp-btn nzp-btn--jump" id="nzpJump" aria-label="קפיצה">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-6 5 6H7z"/></svg>' +
+    '</button>';
   document.body.appendChild(hud);
+
   var canvas0 = canvasEl();
   if (canvas0) {
     canvas0.tabIndex = 0;
     try { canvas0.focus(); } catch (e) {}
   }
 
-  var lookPad = document.getElementById('nzpLook');
-  var looking = false;
-  var lastX = 0;
-  var lastY = 0;
-  var smx = 0;
-  var smy = 0;
-
-  lookPad.addEventListener('touchstart', function (e) {
-    if (!e.changedTouches.length) return;
-    e.preventDefault();
-    looking = true;
-    lastX = e.changedTouches[0].clientX;
-    lastY = e.changedTouches[0].clientY;
-    smx = 0;
-    smy = 0;
-    var canvas = canvasEl();
-    if (canvas) {
-      try { canvas.focus(); } catch (err) {}
+  var sticks = {
+    move: {
+      el: document.getElementById('nzpMove'),
+      knob: document.getElementById('nzpMoveKnob'),
+      id: null,
+      ox: 0,
+      oy: 0
+    },
+    look: {
+      el: document.getElementById('nzpLookStick'),
+      knob: document.getElementById('nzpLookKnob'),
+      id: null,
+      lx: 0,
+      ly: 0
     }
-  }, { passive: false });
-  lookPad.addEventListener('touchmove', function (e) {
-    if (!looking || !e.touches.length) return;
-    e.preventDefault();
-    var t = e.touches[0];
-    var dx = (t.clientX - lastX) * LOOK_SCALE;
-    var dy = (t.clientY - lastY) * LOOK_SCALE;
-    lastX = t.clientX;
-    lastY = t.clientY;
-    smx = smx * 0.28 + dx * 0.72;
-    smy = smy * 0.28 + dy * 0.72;
-    if (smx || smy) fteLook(smx, smy);
-  }, { passive: false });
-  function lookEnd(e) {
-    if (e) e.preventDefault();
-    looking = false;
-    smx = 0;
-    smy = 0;
-  }
-  lookPad.addEventListener('touchend', lookEnd, { passive: false });
-  lookPad.addEventListener('touchcancel', lookEnd, { passive: false });
+  };
 
-  var walkCmd = null;
-  var walkSpeed = 0;
-  var lastSentSpeed = -1;
-
-  function walkTick() {
-    var target = walkCmd ? WALK_TOP : 0;
-    walkSpeed += (target - walkSpeed) * (walkCmd ? WALK_SMOOTH_UP : WALK_SMOOTH_DOWN);
-    if (!walkCmd && walkSpeed < 12) {
-      walkSpeed = 0;
+  function resetStick(which) {
+    var s = sticks[which];
+    s.id = null;
+    s.knob.style.transform = 'translate(-50%, -50%)';
+    if (which === 'move') {
       setImpulse('forward', false);
       setImpulse('back', false);
-      lastSentSpeed = -1;
-    } else if (walkCmd) {
-      var s = Math.round(Math.max(48, walkSpeed));
-      if (Math.abs(s - lastSentSpeed) >= 8) {
-        cbuf('cl_forwardspeed ' + s);
-        cbuf('cl_backspeed ' + s);
-        lastSentSpeed = s;
-      }
-      setImpulse(walkCmd, true);
-      setImpulse(walkCmd === 'forward' ? 'back' : 'forward', false);
+      setImpulse('moveleft', false);
+      setImpulse('moveright', false);
     }
-    requestAnimationFrame(walkTick);
   }
-  requestAnimationFrame(walkTick);
 
-  function holdWalk(id, name) {
-    var el = document.getElementById(id);
-    function down(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      walkCmd = name;
+  function clampStick(dx, dy) {
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var max = STICK_R;
+    if (len > max) {
+      dx = (dx / len) * max;
+      dy = (dy / len) * max;
+      len = max;
     }
-    function up(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (walkCmd === name) walkCmd = null;
-    }
-    el.addEventListener('touchstart', down, { passive: false });
-    el.addEventListener('touchend', up, { passive: false });
-    el.addEventListener('touchcancel', up, { passive: false });
+    return { dx: dx, dy: dy, nx: dx / max, ny: dy / max };
   }
+
+  function applyMove(nx, ny) {
+    setImpulse('forward', ny < -MOVE_DEAD);
+    setImpulse('back', ny > MOVE_DEAD);
+    setImpulse('moveleft', nx < -MOVE_DEAD);
+    setImpulse('moveright', nx > MOVE_DEAD);
+  }
+
+  function bindStick(which) {
+    var s = sticks[which];
+    s.el.addEventListener('touchstart', function (e) {
+      if (s.id !== null) return;
+      var t = e.changedTouches[0];
+      if (!t) return;
+      e.preventDefault();
+      e.stopPropagation();
+      s.id = t.identifier;
+      var rect = s.el.getBoundingClientRect();
+      s.ox = rect.left + rect.width / 2;
+      s.oy = rect.top + rect.height / 2;
+      if (which === 'look') {
+        s.lx = t.clientX;
+        s.ly = t.clientY;
+      } else {
+        var m = clampStick(t.clientX - s.ox, t.clientY - s.oy);
+        s.knob.style.transform = 'translate(calc(-50% + ' + m.dx + 'px), calc(-50% + ' + m.dy + 'px))';
+        applyMove(m.nx, m.ny);
+      }
+      var canvas = canvasEl();
+      if (canvas) {
+        try { canvas.focus(); } catch (err) {}
+      }
+    }, { passive: false });
+
+    s.el.addEventListener('touchmove', function (e) {
+      if (s.id === null) return;
+      var t = null;
+      for (var i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === s.id) { t = e.touches[i]; break; }
+      }
+      if (!t) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (which === 'look') {
+        var dx = (t.clientX - s.lx) * LOOK_SCALE;
+        var dy = (t.clientY - s.ly) * LOOK_SCALE;
+        s.lx = t.clientX;
+        s.ly = t.clientY;
+        var vis = clampStick(t.clientX - s.ox, t.clientY - s.oy);
+        s.knob.style.transform = 'translate(calc(-50% + ' + vis.dx + 'px), calc(-50% + ' + vis.dy + 'px))';
+        if (dx || dy) fteLook(dx, dy);
+      } else {
+        var m2 = clampStick(t.clientX - s.ox, t.clientY - s.oy);
+        s.knob.style.transform = 'translate(calc(-50% + ' + m2.dx + 'px), calc(-50% + ' + m2.dy + 'px))';
+        applyMove(m2.nx, m2.ny);
+      }
+    }, { passive: false });
+
+    function end(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === s.id) {
+          e.preventDefault();
+          resetStick(which);
+          break;
+        }
+      }
+    }
+    s.el.addEventListener('touchend', end, { passive: false });
+    s.el.addEventListener('touchcancel', end, { passive: false });
+  }
+
+  bindStick('move');
+  bindStick('look');
+
   function holdBtn(id, name) {
     var el = document.getElementById(id);
     function down(e) {
@@ -202,11 +285,21 @@
     el.addEventListener('touchend', up, { passive: false });
     el.addEventListener('touchcancel', up, { passive: false });
   }
-  holdWalk('nzpFwd', 'forward');
-  holdWalk('nzpBack', 'back');
+
   holdBtn('nzpFire', 'attack');
   holdBtn('nzpUse', 'use');
-  holdBtn('nzpJump', 'jump');
+
+  document.getElementById('nzpAds').addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setAds(!keys.ads);
+  }, { passive: false });
+
+  document.getElementById('nzpJump').addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    tapJump();
+  }, { passive: false });
 
   window.addEventListener('blur', allKeysUp);
   document.addEventListener('visibilitychange', function () {
